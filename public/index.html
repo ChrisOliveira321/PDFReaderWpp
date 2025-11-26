@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Painel CRLV</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        td, th { border: 1px solid #ccc; padding: 10px; }
+        button { padding: 6px 12px; }
+    </style>
+</head>
+<body>
+
+<h1>📄 CRLV Recebidos</h1>
+
+<table id="tabela">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Placa</th>
+            <th>CPF/CNPJ</th>
+            <th>Data</th>
+            <th>Ação</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+fetch("/api/crlv")
+    .then(r => r.json())
+    .then(dados => {
+        const tbody = document.querySelector("tbody");
+        dados.forEach(row => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${row.id}</td>
+                    <td>${row.placa}</td>
+                    <td>${row.cpf_cnpj}</td>
+                    <td>${row.data_recebido}</td>
+                    <td>
+                        <button onclick="preencher(${row.id})">Preencher Fertipar</button>
+                    </td>
+                </tr>
+            `;
+        });
+    });
+
+function preencher(id) {
+    fetch("/api/preencher/" + id);
+    alert("Abrindo formulário…");
+}
+</script>
+
+</body>
+</html>
