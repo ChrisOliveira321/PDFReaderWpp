@@ -20,7 +20,7 @@ def extrair_campos(pdf_path):
         dados["renavam"] = renavam.group(1) if renavam else None
 
         # PLACA
-        placa = re.search(r"PLACA\s+([A-Z0-9]{7})", texto, re.I)
+        placa = re.search(r"\b([A-Z]{3}[0-9][A-Z0-9][0-9]{2})\b", texto, re.I)
         dados["placa"] = placa.group(1) if placa else None
 
         # CPF/CNPJ
