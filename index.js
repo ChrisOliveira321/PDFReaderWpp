@@ -3,13 +3,16 @@ const qrcode = require("qrcode-terminal");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const db = require("./db"); // 🔥 BANCO DE DADOS
 
-// --- pasta pdfs ---
+// ---------------------------------------------------
+// Pasta onde os PDFs serão salvos
+// ---------------------------------------------------
 const DOWNLOAD_DIR = path.join(__dirname, "pdfs");
 if (!fs.existsSync(DOWNLOAD_DIR)) fs.mkdirSync(DOWNLOAD_DIR);
 
 // ---------------------------------------------------
-// Função para verificar se o arquivo é um PDF
+// Verifica se o arquivo é PDF
 // ---------------------------------------------------
 function isPdf(media) {
     if (!media) return false;
@@ -27,7 +30,7 @@ function isPdf(media) {
 }
 
 // ---------------------------------------------------
-// Função que chama o Python e retorna os dados do PDF
+// Executa o Python para extrair dados do CRLV
 // ---------------------------------------------------
 function extrairDadosCRLV(caminhoPDF) {
     return new Promise((resolve, reject) => {
@@ -40,11 +43,14 @@ function extrairDadosCRLV(caminhoPDF) {
         processo.stderr.on("data", (data) => (erro += data.toString()));
 
         processo.on("close", (code) => {
-            if (code !== 0) return reject("Erro ao executar script Python: " + erro);
+            if (code !== 0) {
+                return reject("Erro no Python: " + erro);
+            }
+
             try {
                 resolve(JSON.parse(saida));
             } catch (e) {
-                reject("Falha ao converter JSON retornado pelo Python: " + e);
+                reject("Erro ao converter JSON: " + e);
             }
         });
     });
@@ -61,102 +67,134 @@ const client = new Client({
     }
 });
 
-// QR CODE
+// QR Code
 client.on("qr", (qr) => {
     console.log("\nJarvis: Escaneie o QR Code, senhor:\n");
     qrcode.generate(qr, { small: true });
 });
 
-// READY
+// Ready
 client.on("ready", () => {
     console.log("Jarvis: Sistema online, senhor.");
-    console.log("Jarvis: Monitorando novas mensagens...\n");
+    console.log("Jarvis: Monitorando mensagens...\n");
 });
 
 // ---------------------------------------------------
-// Quando chega mensagem
+// Evento principal — Recebimento de mensagem
 // ---------------------------------------------------
 client.on("message", async (msg) => {
+    let filePath = null;
+    let registroId = null;
+
     try {
-        // limpa console
         console.clear();
         console.log("===== JARVIS ONLINE — MONITORANDO WHATSAPP =====\n");
 
-        // pega o contato com nome salvo
-        const contato = await msg.getContact();
-        const nome =
-            contato.pushname ||
-            contato.name ||
-            contato.number ||
-            msg.from;
+        // ---------- Nome do contato ----------
+        let nome = msg.from;
+        try {
+            const chat = await msg.getChat();
+            nome =
+                chat?.contact?.pushname ||
+                chat?.contact?.name ||
+                chat?.contact?.number ||
+                msg.from;
+        } catch {}
 
-        console.log(`Jarvis: Nova mensagem recebida de ${nome}, senhor.`);
+        console.log(`Jarvis: Nova mensagem de ${nome}, senhor.`);
 
+        // ---------- Ignora mensagens sem mídia ----------
         if (!msg.hasMedia) {
             console.log("Jarvis: Mensagem sem anexos.");
             return;
         }
 
-        console.log("Jarvis: Baixando o arquivo...");
-
-        let media;
-        try {
-            media = await msg.downloadMedia();
-        } catch {
-            console.log("Jarvis: Falha ao baixar o anexo, senhor.");
-            return;
-        }
+        console.log("Jarvis: Baixando arquivo...");
+        const media = await msg.downloadMedia();
 
         if (!media) {
-            console.log("Jarvis: O arquivo não foi baixado corretamente.");
+            console.log("Jarvis: Falha ao baixar mídia.");
             return;
         }
 
         console.log("Jarvis: Analisando arquivo...");
 
-        const ehPdf = isPdf(media);
-        if (!ehPdf) {
-            console.log("Jarvis: O arquivo não é PDF, descartando.");
+        if (!isPdf(media)) {
+            console.log("Jarvis: Arquivo não é PDF.");
             return;
         }
 
-        console.log("Jarvis: PDF identificado, iniciando extração.");
+        console.log("Jarvis: PDF identificado.");
 
-        // --- salvar PDF ---
+        // ---------- Salva PDF ----------
         const pdfBuffer = Buffer.from(media.data, "base64");
         const fileName = `crlv_${Date.now()}.pdf`;
-        const filePath = path.join(DOWNLOAD_DIR, fileName);
+        filePath = path.join(DOWNLOAD_DIR, fileName);
 
         fs.writeFileSync(filePath, pdfBuffer);
-        console.log("Jarvis: Arquivo salvo em:", filePath);
+        console.log("Jarvis: PDF salvo em:", filePath);
 
-        // --- chamar Python ---
-        try {
-            console.log("Jarvis: Executando análise via Python...");
+        // ---------- Insere registro inicial com status 'novo' ----------
+        const stmtNovo = db.prepare(`
+            INSERT INTO crlv (pdf_path, status)
+            VALUES (?, ?)
+        `);
+        const infoNovo = stmtNovo.run(filePath, "novo");
+        registroId = infoNovo.lastInsertRowid;
 
-            const dados = await extrairDadosCRLV(filePath);
+        console.log(`Jarvis: Registro criado no banco com ID ${registroId} e status 'novo'.`);
 
-            console.log("Jarvis: Extração concluída:");
-            console.log(dados);
+        // ---------- Extrai dados ----------
+        console.log("Jarvis: Executando extração via Python...");
+        const dados = await extrairDadosCRLV(filePath);
 
-            let resposta = "Jarvis: Eis os dados extraídos do documento:\n\n";
+        console.log("Jarvis: Dados extraídos:", dados);
 
-            resposta += `RENAVAM: *${dados.renavam || "Não encontrado"}*\n`;
-            resposta += `PLACA: *${dados.placa || "Não encontrada"}*\n`;
-            resposta += `CPF/CNPJ: *${dados.cpf_cnpj || "Não encontrado"}*\n`;
+        // ---------- Atualiza registro com dados e status 'processado' ----------
+        db.prepare(`
+            UPDATE crlv
+            SET placa = ?, cpf_cnpj = ?, renavam = ?, status = ?
+            WHERE id = ?
+        `).run(
+            dados.placa || null,
+            dados.cpf_cnpj || null,
+            dados.renavam || null,
+            "processado",
+            registroId
+        );
 
-            await msg.reply(resposta);
+        console.log(`Jarvis: Registro ${registroId} atualizado com status 'processado'.`);
 
-        } catch (err) {
-            console.log("Jarvis: Erro ao processar PDF:", err);
-            await msg.reply("Jarvis: Não consegui extrair os dados do PDF, senhor.");
-        }
+        // ---------- Resposta WhatsApp ----------
+        let resposta = "Jarvis: Eis os dados extraídos do documento:\n\n";
+        resposta += `RENAVAM: *${dados.renavam || "Não encontrado"}*\n`;
+        resposta += `PLACA: *${dados.placa || "Não encontrada"}*\n`;
+        resposta += `CPF/CNPJ: *${dados.cpf_cnpj || "Não encontrado"}*\n`;
+
+        await msg.reply(resposta);
 
     } catch (err) {
-        console.log("Jarvis: Falha inesperada:");
-        console.log(err);
+        console.log("Jarvis: Erro inesperado:", err);
+
+        // ---------- Atualiza status para 'erro' ----------
+        if (registroId) {
+            db.prepare(`
+                UPDATE crlv
+                SET status = ?
+                WHERE id = ?
+            `).run("erro", registroId);
+            console.log(`Jarvis: Registro ${registroId} atualizado com status 'erro'.`);
+        } else if (filePath) {
+            // Caso nem tenha conseguido criar registro
+            db.prepare(`
+                INSERT INTO crlv (pdf_path, status)
+                VALUES (?, ?)
+            `).run(filePath, "erro");
+        }
+
+        await msg.reply("Jarvis: Não consegui processar o documento, senhor.");
     }
 });
 
-// Inicializa
+// Inicializa o bot
 client.initialize();
