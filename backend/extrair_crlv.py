@@ -33,7 +33,7 @@ def extrair_campos(pdf_path):
 
         dados = {}
 
-        print(texto)
+        """ print(texto) """
 
         # Exercício
         dados["exercicio"] = extrair(

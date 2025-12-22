@@ -1,12 +1,19 @@
-const path = require("path");
-const Database = require("better-sqlite3");
+import path from "path";
+import { fileURLToPath } from "url";
+import Database from "better-sqlite3";
 
+// 🚨 Como __dirname não existe em ES Module, criamos:
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Caminho do banco
 const dbPath = path.join(__dirname, "crlv.db");
-
 console.log("🗄️ Banco SQLite em uso:", dbPath);
 
+// Cria conexão
 const db = new Database(dbPath);
 
+// Cria tabela CRLV caso não exista
 db.prepare(`
   CREATE TABLE IF NOT EXISTS crlv (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,4 +51,5 @@ db.prepare(`
   )
 `).run();
 
-module.exports = db;
+// Exporta para ES Module
+export default db;
