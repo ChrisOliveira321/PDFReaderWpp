@@ -1,0 +1,169 @@
+/* ======================================================
+   VARIÁVEIS DE TEMA – RODOFROTA
+====================================================== */
+:root {
+  --cor-primaria: #c1121f;
+  --cor-primaria-hover: #a50f1a;
+
+  --cor-bg-geral: #f5f7fa;
+  --cor-bg-card: #ffffff;
+  --cor-bg-suave: #fff5f5;
+
+  --cor-texto-principal: #111827;
+  --cor-texto-secundario: #6b7280;
+
+  --cor-borda-suave: #f3c2c2;
+
+  --sombra-card: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ======================================================
+   CONTAINER PRINCIPAL
+====================================================== */
+.dadosExtraidos-container {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: calc(100vh - 64px);
+  background-color: var(--cor-bg-geral);
+  padding: 24px;
+  gap: 24px;
+  box-sizing: border-box;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* ======================================================
+   LISTA DE PDFs (ESQUERDA)
+====================================================== */
+.lista-pdfs {
+  background: var(--cor-bg-card);
+  border-radius: 14px;
+  box-shadow: var(--sombra-card);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Título */
+.lista-pdfs h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cor-texto-principal);
+  margin-bottom: 12px;
+}
+
+/* Lista */
+.lista-pdfs ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+}
+
+/* Item */
+.lista-pdfs li {
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* Hover */
+.lista-pdfs li:hover {
+  background: var(--cor-bg-suave);
+  color: var(--cor-primaria);
+}
+
+/* Ativo */
+.lista-pdfs li.ativo {
+  background: var(--cor-primaria);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* Scroll bonito */
+.lista-pdfs ul::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lista-pdfs ul::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 8px;
+}
+
+.lista-pdfs ul::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ======================================================
+   DADOS EXTRAÍDOS (DIREITA)
+====================================================== */
+.dados-extraidos {
+  background: var(--cor-bg-card);
+  border-radius: 14px;
+  box-shadow: var(--sombra-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cabeçalho */
+.dados-extraidos h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  margin-bottom: 20px;
+}
+
+/* Grid */
+.dados-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+/* Card individual */
+.dado {
+  background: var(--cor-bg-card);
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--cor-borda-suave);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Hover do card */
+.dado:hover {
+  box-shadow: 0 6px 16px rgba(193, 18, 31, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Label */
+.dado span {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #9b1c1c;
+  margin-bottom: 6px;
+}
+
+/* Valor */
+.dado strong {
+  font-size: 14px;
+  color: var(--cor-texto-principal);
+  font-weight: 600;
+}
+
+/* ======================================================
+   ESTADO VAZIO
+====================================================== */
+.estado-vazio {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 14px;
+}

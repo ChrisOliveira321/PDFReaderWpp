@@ -1,0 +1,7 @@
+.listaPdfs {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}

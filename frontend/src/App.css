@@ -1,0 +1,33 @@
+/* Aplica a cor de fundo na tela inteira */
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #f5f7fa; /* mesma cor do DadosExtraidos */
+  font-family: Arial, sans-serif;
+  color: #fff;
+}
+
+/* Mantém a centralização do conteúdo */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+
+/* Se você quiser que as cards do DadosExtraidos se destaquem */
+.card {
+  background-color: #2e2e4e; /* cor das caixas */
+  border-radius: 12px;
+  padding: 2em;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+:root {
+  --topbar-height: 96px;
+  --logo-height: 64px;
+  --menu-font-size: 18px;
+  --menu-gap: 32px;
+}
