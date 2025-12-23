@@ -1,9 +1,10 @@
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-const { spawn } = require("child_process");
-const puppeteer = require("puppeteer");
-const db = require("./db");
+// server.js
+import express from "express";
+import cors from "cors";
+import path from "path";
+import { spawn } from "child_process";
+import puppeteer from "puppeteer";
+import db from "./db.js"; // ES Module
 
 const app = express();
 
@@ -12,7 +13,7 @@ const app = express();
 // --------------------------------------------------
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(path.resolve(), "public")));
 
 // --------------------------------------------------
 // Executa Python e retorna JSON
@@ -24,13 +25,11 @@ function extrairDadosCRLV(pdfPath) {
     let out = "";
     let err = "";
 
-    py.stdout.on("data", d => out += d.toString());
-    py.stderr.on("data", d => err += d.toString());
+    py.stdout.on("data", (d) => (out += d.toString()));
+    py.stderr.on("data", (d) => (err += d.toString()));
 
-    py.on("close", code => {
-      if (code !== 0) {
-        return reject(err || "Erro desconhecido no Python");
-      }
+    py.on("close", (code) => {
+      if (code !== 0) return reject(err || "Erro desconhecido no Python");
       try {
         resolve(JSON.parse(out));
       } catch (e) {
@@ -45,12 +44,7 @@ function extrairDadosCRLV(pdfPath) {
 // --------------------------------------------------
 app.get("/api/crlv", (req, res) => {
   try {
-    const rows = db.prepare(`
-      SELECT *
-      FROM crlv
-      ORDER BY id DESC
-    `).all();
-
+    const rows = db.prepare(`SELECT * FROM crlv ORDER BY id DESC`).all();
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -64,14 +58,9 @@ app.get("/api/crlv", (req, res) => {
 app.get("/api/crlv/:id", (req, res) => {
   try {
     const { id } = req.params;
+    const row = db.prepare("SELECT * FROM crlv WHERE id = ?").get(id);
 
-    const row = db
-      .prepare("SELECT * FROM crlv WHERE id = ?")
-      .get(id);
-
-    if (!row) {
-      return res.status(404).json({ erro: "CRLV não encontrado" });
-    }
+    if (!row) return res.status(404).json({ erro: "CRLV não encontrado" });
 
     res.json(row);
   } catch (err) {
@@ -80,25 +69,21 @@ app.get("/api/crlv/:id", (req, res) => {
   }
 });
 
-
 // --------------------------------------------------
 // Processa PDF (Node → Python → DB)
 // --------------------------------------------------
 app.post("/api/processar", async (req, res) => {
   const { pdf_path } = req.body;
 
-  if (!pdf_path) {
-    return res.status(400).json({ erro: "pdf_path obrigatório" });
-  }
+  if (!pdf_path) return res.status(400).json({ erro: "pdf_path obrigatório" });
 
   let registroId;
 
   try {
     // Cria registro inicial
-    const info = db.prepare(`
-      INSERT INTO crlv (pdf_path, status)
-      VALUES (?, ?)
-    `).run(pdf_path, "processando");
+    const info = db
+      .prepare("INSERT INTO crlv (pdf_path, status) VALUES (?, ?)")
+      .run(pdf_path, "processando");
 
     registroId = info.lastInsertRowid;
 
@@ -106,34 +91,16 @@ app.post("/api/processar", async (req, res) => {
     const dados = await extrairDadosCRLV(pdf_path);
 
     // Atualiza banco com JSON completo
-    db.prepare(`
-      UPDATE crlv SET
-        exercicio = ?,
-        ano_fabricacao = ?,
-        ano_modelo = ?,
-        placa = ?,
-        renavam = ?,
-        numero_crv = ?,
-        codigo_seguranca_cla = ?,
-        marca_modelo_versao = ?,
-        especie_tipo = ?,
-        chassi = ?,
-        cor_predominante = ?,
-        combustivel = ?,
-        categoria = ?,
-        capacidade = ?,
-        potencia_cilindrada = ?,
-        peso_bruto_total = ?,
-        motor = ?,
-        cmt = ?,
-        eixos = ?,
-        lotacao = ?,
-        carroceria = ?,
-        nome_proprietario = ?,
-        local = ?,
-        status = ?
-      WHERE id = ?
-    `).run(
+    db.prepare(
+      `UPDATE crlv SET
+        exercicio = ?, ano_fabricacao = ?, ano_modelo = ?,
+        placa = ?, renavam = ?, numero_crv = ?, codigo_seguranca_cla = ?,
+        marca_modelo_versao = ?, especie_tipo = ?, chassi = ?, cor_predominante = ?,
+        combustivel = ?, categoria = ?, capacidade = ?, potencia_cilindrada = ?, peso_bruto_total = ?,
+        motor = ?, cmt = ?, eixos = ?, lotacao = ?, carroceria = ?,
+        nome_proprietario = ?, local = ?, status = ?
+      WHERE id = ?`
+    ).run(
       dados.exercicio,
       dados.ano_fabricacao,
       dados.ano_modelo,
@@ -162,14 +129,11 @@ app.post("/api/processar", async (req, res) => {
     );
 
     res.json({ ok: true, id: registroId });
-
   } catch (err) {
     console.error("Erro no processamento:", err);
 
-    if (registroId) {
-      db.prepare("UPDATE crlv SET status=? WHERE id=?")
-        .run("erro", registroId);
-    }
+    if (registroId)
+      db.prepare("UPDATE crlv SET status=? WHERE id=?").run("erro", registroId);
 
     res.status(500).json({ erro: "Falha ao processar CRLV" });
   }
@@ -182,22 +146,14 @@ app.post("/api/preencher/:id", async (req, res) => {
   const { id } = req.params;
   const row = db.prepare("SELECT * FROM crlv WHERE id=?").get(id);
 
-  if (!row) {
-    return res.status(404).json({ erro: "Registro não encontrado" });
-  }
+  if (!row) return res.status(404).json({ erro: "Registro não encontrado" });
 
   let browser;
 
   try {
-    browser = await puppeteer.launch({
-      headless: false,
-      defaultViewport: null
-    });
-
+    browser = await puppeteer.launch({ headless: false, defaultViewport: null });
     const page = await browser.newPage();
-    await page.goto("https://fertipar.com/formulario", {
-      waitUntil: "networkidle2"
-    });
+    await page.goto("https://fertipar.com/formulario", { waitUntil: "networkidle2" });
 
     // -------- Preenchimento --------
     await page.type("#placa", row.placa ?? "");
@@ -209,24 +165,15 @@ app.post("/api/preencher/:id", async (req, res) => {
     await page.type("#anoModelo", row.ano_modelo ?? "");
     await page.type("#anoFabricacao", row.ano_fabricacao ?? "");
 
-    // -------------------------------
-    db.prepare("UPDATE crlv SET status=? WHERE id=?")
-      .run("enviado", id);
-
+    // Atualiza status
+    db.prepare("UPDATE crlv SET status=? WHERE id=?").run("enviado", id);
     res.json({ ok: true });
-
   } catch (err) {
     console.error("Erro Puppeteer:", err);
-
-    db.prepare("UPDATE crlv SET status=? WHERE id=?")
-      .run("erro", id);
-
+    db.prepare("UPDATE crlv SET status=? WHERE id=?").run("erro", id);
     res.status(500).json({ erro: "Falha ao preencher formulário" });
-
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    if (browser) await browser.close();
   }
 });
 
@@ -234,7 +181,6 @@ app.post("/api/preencher/:id", async (req, res) => {
 // Start servidor
 // --------------------------------------------------
 const PORT = 3001;
-
 app.listen(PORT, () => {
   console.log(`🚀 API rodando em http://localhost:${PORT}`);
 });
