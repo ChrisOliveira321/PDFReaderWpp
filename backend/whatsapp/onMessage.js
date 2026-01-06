@@ -3,8 +3,9 @@ import path from "path";
 
 import { isPdf } from "../utils/pdfValidator.js";
 import { isCRLV } from "../utils/crlvValidator.js";
-import { extractTextFromPdfBase64 } from "../utils/pdfTextExtractor.js"; // ES Modules
+import { extractTextFromPdfBase64 } from "../utils/pdfTextExtractor.js";
 import { extrairDadosCRLV } from "../services/crlvExtractor.js";
+import { validarCrlv } from "../utils/crlvValidator.js";
 import { insertCrlv, updateCrlv, markAsErro } from "../repositories/crlvRepository.js";
 
 const DOWNLOAD_DIR = path.join(process.cwd(), "pdfs");
@@ -15,49 +16,34 @@ export async function onMessage(msg) {
   let registroId = null;
 
   try {
-    // 🔹 Ignora mensagens sem mídia ou documentos
     if (!msg.hasMedia && msg.type !== "document") return;
 
-    // 🔹 Baixa mídia
     const media = await msg.downloadMedia();
     if (!media || !media.data) return;
 
-    // 🔹 Valida se é PDF
-    if (!isPdf(media)) {
-      console.log("❌ Ignorado: não é PDF");
-      return;
-    }
+    if (!isPdf(media)) return;
 
-    console.log("📄 PDF recebido, extraindo texto...");
-
-    // 🔹 Extração de texto usando pdfjs-dist
     const textoExtraido = await extractTextFromPdfBase64(media.data);
 
-    // 🔹 Verifica se parece CRLV
-    if (!isCRLV(textoExtraido, true)) {
-      console.log("❌ PDF não parece CRLV");
-      return;
-    }
+    if (!isCRLV(textoExtraido, true)) return;
 
-    console.log("✅ PDF válido e parece CRLV");
-
-    // 🔹 Salva PDF localmente
     const pdfBuffer = Buffer.from(media.data, "base64");
     const fileName = `crlv_${Date.now()}.pdf`;
     filePath = path.join(DOWNLOAD_DIR, fileName);
     fs.writeFileSync(filePath, pdfBuffer);
-    console.log(`💾 PDF salvo em: ${filePath}`);
 
-    // 🔹 Cria registro no banco
     registroId = insertCrlv(filePath);
 
-    console.log("🔍 Extração completa via Python em andamento...");
-    const dados = await extrairDadosCRLV(filePath);
+    const dadosExtraidos = await extrairDadosCRLV(filePath);
+    const dadosValidados = validarCrlv(dadosExtraidos);
 
-    // 🔹 Atualiza registro com os dados extraídos
-    updateCrlv(registroId, dados);
+    console.log(
+      "DEBUG FINAL:",
+      dadosValidados.exercicio,
+      dadosValidados.status
+    );
 
-    console.log("✅ Registro atualizado com sucesso");
+    updateCrlv(registroId, dadosValidados);
 
   } catch (err) {
     console.error("❌ Erro ao processar documento:", err);

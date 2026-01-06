@@ -1,3 +1,17 @@
+export function validarCrlv(dados) {
+    const exercicio = Number(dados.exercicio);
+
+    if (!exercicio || Number.isNaN(exercicio)) {
+        return { ...dados, status: "erro_validacao" };
+    }
+
+    if (exercicio < 2025) {
+        return { ...dados, status: "vencido" };
+    }
+
+    return { ...dados, status: "processado" };
+}
+
 export function isCRLV(texto, debug = false) {
   if (debug) {
     console.log("\n🧾 ===== TEXTO EXTRAÍDO DO PDF =====");

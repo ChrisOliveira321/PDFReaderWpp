@@ -8,6 +8,10 @@ export function insertCrlv(pdfPath) {
 }
 
 export function updateCrlv(id, dados) {
+    if (!dados.status) {
+        throw new Error("Status não definido antes de persistir CRLV");
+    }
+
     db.prepare(`
         UPDATE crlv SET
             exercicio = ?,
@@ -37,7 +41,7 @@ export function updateCrlv(id, dados) {
         dados.nome_proprietario ?? null,
         dados.local ?? null,
         JSON.stringify(dados),
-        "processado",
+        dados.status,
         id
     );
 }
